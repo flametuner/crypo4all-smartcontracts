@@ -32,7 +32,7 @@ contract Crypto4You is Ownable {
   event UserFunded(
     uint256 indexed campaignId,
     address indexed user,
-    string tweetId
+    string tweetUrl
   );
 
   struct Campaign {
@@ -44,7 +44,7 @@ contract Crypto4You is Ownable {
     uint256 totalFees;
     bool paused;
     mapping(address => bool) usersFund;
-    mapping(string => bool) tweetIds;
+    mapping(string => bool) twitterUserIds;
   }
 
   modifier onlyExecutor() {
@@ -108,21 +108,27 @@ contract Crypto4You is Ownable {
   function batchCheckTweets(
     uint256 _campaignId,
     address[] memory _users,
-    string[] memory _tweetIds
+    string[] memory _twitterUserIds,
+    string[] memory _tweetUrls
   ) public onlyExecutor {
-    require(_users.length == _tweetIds.length, "must have the same length");
+    require(
+      _users.length == _twitterUserIds.length &&
+        _users.length == _tweetUrls.length,
+      "must have the same length"
+    );
     for (uint256 i = 0; i < _users.length; i++) {
-      checkTweet(_campaignId, _users[i], _tweetIds[i]);
+      checkTweet(_campaignId, _users[i], _twitterUserIds[i], _tweetUrls[i]);
     }
   }
 
   function checkTweet(
     uint256 _campaignId,
     address _user,
-    string memory _tweetId
+    string memory _twitterUserId,
+    string memory _tweetUrl
   ) public onlyExecutor {
     require(_user != address(0x0), "User address must be valid");
-    require(bytes(_tweetId).length > 0, "Tweet Id can't be empty");
+    require(bytes(_twitterUserId).length > 0, "Tweet Id can't be empty");
 
     Campaign storage campaign = campaigns[_campaignId];
 
@@ -133,15 +139,18 @@ contract Crypto4You is Ownable {
     require(campaign.paused == false, "Campaign is paused");
 
     require(campaign.usersFund[_user] == false, "User already funded");
-    require(campaign.tweetIds[_tweetId] == false, "Tweet already used");
+    require(
+      campaign.twitterUserIds[_twitterUserId] == false,
+      "Tweet already used"
+    );
     campaign.usersFund[_user] = true;
-    campaign.tweetIds[_tweetId] = true;
+    campaign.twitterUserIds[_twitterUserId] = true;
 
     campaign.totalValue -= campaign.valuePerShare + campaign.feePerShare;
     campaign.totalFees += campaign.feePerShare;
     IERC20(campaign.tokenAddress).transfer(_user, campaign.valuePerShare);
 
-    emit UserFunded(_campaignId, _user, _tweetId);
+    emit UserFunded(_campaignId, _user, _tweetUrl);
 
     verifyForPausing(_campaignId);
   }

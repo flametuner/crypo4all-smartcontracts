@@ -228,12 +228,12 @@ describe("Check tweets", () => {
   let campaignId: number;
   let feePercentage: number;
   let campaign: Campaign;
-  let tweetId: number;
+  let userIdCounter: number;
   // Deploy the contract
 
   before(async () => {
     campaignId = 0;
-    tweetId = 0;
+    userIdCounter = 0;
     const Crypto4You = await ethers.getContractFactory("Crypto4You");
     const TestToken = await ethers.getContractFactory("TestToken");
     [owner, executor, user] = await ethers.getSigners();
@@ -271,14 +271,14 @@ describe("Check tweets", () => {
   it("should check tweets", async () => {
     const balanceBefore = await erc20.balanceOf(user.address);
 
-    const ttId = `random_id_${tweetId++}`;
+    const userId = `random_id_${userIdCounter++}`;
     const checkTweetTx = await instance
       .connect(executor)
-      .checkTweet(campaign.id, user.address, ttId);
+      .checkTweet(campaign.id, user.address, userId, "tweet_url");
 
     expect(checkTweetTx)
       .to.emit(instance, "UserFunded")
-      .withArgs(campaign.id, user.address, ttId);
+      .withArgs(campaign.id, user.address, "tweet_url");
 
     const balanceAfter = await erc20.balanceOf(user.address);
 
