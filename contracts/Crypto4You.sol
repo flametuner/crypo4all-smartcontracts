@@ -63,7 +63,7 @@ contract Crypto4You is Ownable {
   }
 
   function setFeePercentage(uint256 _feePercentage) public onlyOwner {
-    require(_feePercentage < 1000, "Fee max is 10%");
+    require(_feePercentage <= 1000, "Fee max is 10%");
     feePercentage = _feePercentage;
   }
 
@@ -81,9 +81,7 @@ contract Crypto4You is Ownable {
       campaigns[_campaignId].creator == address(0x0),
       "Campaing already created"
     );
-    require(_token != address(0x0), "Token address must be valid");
-    require(_valuePerShare > 0, "share must be greater than 0");
-    require(_totalValue > 0, "Total must be greater than 0");
+    require(_valuePerShare > 0 && _totalValue > 0, "must be greater than 0");
     require(_valuePerShare <= _totalValue, "share must be less than Total");
 
     require(
@@ -98,7 +96,12 @@ contract Crypto4You is Ownable {
     newCampaign.valuePerShare = _valuePerShare - newCampaign.feePerShare;
     newCampaign.totalValue = _totalValue;
 
-    emit CampaignCreated(_campaignId, _token, _valuePerShare, _totalValue);
+    emit CampaignCreated(
+      _campaignId,
+      _token,
+      newCampaign.valuePerShare,
+      _totalValue
+    );
     emit CampaignStarted(_campaignId);
   }
 
@@ -109,11 +112,11 @@ contract Crypto4You is Ownable {
   ) public onlyExecutor {
     require(_users.length == _tweetIds.length, "must have the same length");
     for (uint256 i = 0; i < _users.length; i++) {
-      checkTweets(_campaignId, _users[i], _tweetIds[i]);
+      checkTweet(_campaignId, _users[i], _tweetIds[i]);
     }
   }
 
-  function checkTweets(
+  function checkTweet(
     uint256 _campaignId,
     address _user,
     string memory _tweetId
@@ -123,6 +126,10 @@ contract Crypto4You is Ownable {
 
     Campaign storage campaign = campaigns[_campaignId];
 
+    require(
+      campaigns[_campaignId].creator != address(0x0),
+      "Campaing isn't created"
+    );
     require(campaign.paused == false, "Campaign is paused");
 
     require(campaign.usersFund[_user] == false, "User already funded");
@@ -209,9 +216,7 @@ contract Crypto4You is Ownable {
     Campaign storage campaign = campaigns[_campaignId];
     require(_valuePerShare <= campaign.totalValue, "Invalid Value per share");
 
-    campaign.feePerShare =
-      (_valuePerShare * feePercentage) /
-      INVERSE_BASIS;
+    campaign.feePerShare = (_valuePerShare * feePercentage) / INVERSE_BASIS;
     campaign.valuePerShare = _valuePerShare - campaign.feePerShare;
     emit CampaignValuePerShareUpdated(_campaignId, _valuePerShare);
   }
