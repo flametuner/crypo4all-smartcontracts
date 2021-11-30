@@ -17,20 +17,20 @@ describe("Fee Percentage", function () {
     await instance.deployed();
   });
 
-  it("should update the fee percentage correctly", async () => {
+  it("should update fee percentage correctly", async () => {
     const setFeePertcentageTx = await instance.setFeePercentage(1000);
     await setFeePertcentageTx.wait();
 
     expect(await instance.feePercentage()).to.equal(1000);
   });
 
-  it("should not be able update the fee percentage greater than 10%", async () => {
+  it("shouldn't update fee percentage greater than 10%", async () => {
     const setFeePertcentageTx = instance.setFeePercentage(1001);
 
     await expect(setFeePertcentageTx).to.be.revertedWith("Fee max is 10%");
   });
 
-  it("should not be able update the fee percentage if not owner", async () => {
+  it("shouldn't update fee percentage if not owner", async () => {
     const setFeePertcentageTx = instance
       .connect(executor)
       .setFeePercentage(1000);
@@ -52,7 +52,7 @@ describe("Executor Update", function () {
     await instance.deployed();
   });
 
-  it("should be able to update the executor", async () => {
+  it("should update the executor", async () => {
     const anotherExecutor = (await ethers.getSigners())[3];
 
     const updateExecutorTx = await instance.updateExecutor(
@@ -63,7 +63,7 @@ describe("Executor Update", function () {
     expect(await instance.executor()).to.equal(anotherExecutor.address);
   });
 
-  it("should not be able to update the executor if not owner", async () => {
+  it("shouldn't update executor if not owner", async () => {
     const anotherExecutor = (await ethers.getSigners())[3];
 
     const updateExecutorTx = instance
@@ -111,7 +111,7 @@ describe("Create Campaign", function () {
     const mintTx = await erc20.mint(owner.address, campaign.totalValue); // 21 million
     await mintTx.wait();
   });
-  it("should create a campaign", async () => {
+  it("should create campaign", async () => {
     const approveTx = await erc20.approve(
       instance.address,
       campaign.totalValue
@@ -151,7 +151,7 @@ describe("Create Campaign", function () {
     );
   });
 
-  it("should not be able to create a campaign if not approved", async () => {
+  it("shouldn't create campaign if not approved", async () => {
     const createCampaignTx = instance.createCampaign(
       campaign.id,
       campaign.tokenAddress,
@@ -163,7 +163,7 @@ describe("Create Campaign", function () {
       "ERC20: transfer amount exceeds allowance"
     );
   });
-  it("should not be able to create a campaign if invalid erc20 token address", async () => {
+  it("shouldn't create campaign if invalid erc20 token address", async () => {
     const notERC20Address = (await ethers.getSigners())[3].address;
 
     const createCampaignTx = instance.createCampaign(
@@ -175,7 +175,7 @@ describe("Create Campaign", function () {
 
     await expect(createCampaignTx).to.be.reverted;
   });
-  it("should not be able to create a campaign for non-erc20 token address", async () => {
+  it("shouldn't create campaign for non-erc20 token address", async () => {
     const createCampaignTx = instance.createCampaign(
       campaign.id,
       instance.address,
@@ -185,7 +185,7 @@ describe("Create Campaign", function () {
 
     await expect(createCampaignTx).to.be.reverted;
   });
-  it("should not be able to create a campaign if invalid value per share", async () => {
+  it("shouldn't create campaign if invalid value per share", async () => {
     const createCampaignTx = instance.createCampaign(
       campaign.id,
       campaign.tokenAddress,
@@ -197,7 +197,7 @@ describe("Create Campaign", function () {
       "share must be less than Total"
     );
   });
-  it("should not be able to create a campaign if value per share is 0", async () => {
+  it("shouldn't create campaign if value per share is 0", async () => {
     const createCampaignTx = instance.createCampaign(
       campaign.id,
       campaign.tokenAddress,
@@ -268,7 +268,7 @@ describe("Check tweets", () => {
     await createCampaignTx.wait();
   });
 
-  it("should be able to check tweets", async () => {
+  it("should check tweets", async () => {
     const balanceBefore = await erc20.balanceOf(user.address);
 
     const ttId = `random_id_${tweetId++}`;
