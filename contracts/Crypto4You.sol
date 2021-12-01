@@ -20,7 +20,6 @@ contract Crypto4You is Ownable {
     uint256 totalValue
   );
 
-  event CampaignStarted(uint256 indexed campaignId);
   event CampaignPaused(uint256 indexed campaignId);
   event CampaignResumed(uint256 indexed campaignId);
   event CampaignFunded(uint256 indexed campaignId, uint256 amount);
@@ -43,8 +42,8 @@ contract Crypto4You is Ownable {
     uint256 totalValue;
     uint256 totalFees;
     bool paused;
-    mapping(address => bool) usersFund;
-    mapping(string => bool) twitterUserIds;
+    mapping(address => bool) addressFunded;
+    mapping(string => bool) userIdsFunded;
   }
 
   modifier onlyExecutor() {
@@ -60,6 +59,22 @@ contract Crypto4You is Ownable {
   constructor(address _executor, uint256 _feePercentage) {
     executor = _executor;
     feePercentage = _feePercentage;
+  }
+
+  function addressFunded(uint256 campaignId, address user)
+    public
+    view
+    returns (bool)
+  {
+    return campaigns[campaignId].addressFunded[user];
+  }
+
+  function userIdFunded(uint256 campaignId, string calldata userId)
+    public
+    view
+    returns (bool)
+  {
+    return campaigns[campaignId].userIdsFunded[userId];
   }
 
   function setFeePercentage(uint256 _feePercentage) public onlyOwner {
@@ -79,7 +94,7 @@ contract Crypto4You is Ownable {
   ) public {
     require(
       campaigns[_campaignId].creator == address(0x0),
-      "Campaing already created"
+      "Campaign already created"
     );
     require(_valuePerShare > 0 && _totalValue > 0, "must be greater than 0");
     require(_valuePerShare <= _totalValue, "share must be less than Total");
@@ -102,49 +117,49 @@ contract Crypto4You is Ownable {
       newCampaign.valuePerShare,
       _totalValue
     );
-    emit CampaignStarted(_campaignId);
   }
 
   function batchCheckTweets(
     uint256 _campaignId,
-    address[] memory _users,
-    string[] memory _twitterUserIds,
-    string[] memory _tweetUrls
+    address[] calldata _users,
+    string[] calldata _userIdsFunded,
+    string[] calldata _tweetUrls
   ) public onlyExecutor {
     require(
-      _users.length == _twitterUserIds.length &&
+      _users.length == _userIdsFunded.length &&
         _users.length == _tweetUrls.length,
       "must have the same length"
     );
     for (uint256 i = 0; i < _users.length; i++) {
-      checkTweet(_campaignId, _users[i], _twitterUserIds[i], _tweetUrls[i]);
+      checkTweet(_campaignId, _users[i], _userIdsFunded[i], _tweetUrls[i]);
     }
   }
 
   function checkTweet(
     uint256 _campaignId,
     address _user,
-    string memory _twitterUserId,
-    string memory _tweetUrl
+    string calldata _twitterUserId,
+    string calldata _tweetUrl
   ) public onlyExecutor {
     require(_user != address(0x0), "User address must be valid");
-    require(bytes(_twitterUserId).length > 0, "Tweet Id can't be empty");
+    require(bytes(_twitterUserId).length > 0, "User Id can't be empty");
+    require(bytes(_tweetUrl).length > 0, "Tweet URL can't be empty");
 
     Campaign storage campaign = campaigns[_campaignId];
 
     require(
       campaigns[_campaignId].creator != address(0x0),
-      "Campaing isn't created"
+      "Campaign isn't created"
     );
     require(campaign.paused == false, "Campaign is paused");
 
-    require(campaign.usersFund[_user] == false, "User already funded");
+    require(campaign.addressFunded[_user] == false, "User already funded");
     require(
-      campaign.twitterUserIds[_twitterUserId] == false,
+      campaign.userIdsFunded[_twitterUserId] == false,
       "Tweet already used"
     );
-    campaign.usersFund[_user] = true;
-    campaign.twitterUserIds[_twitterUserId] = true;
+    campaign.addressFunded[_user] = true;
+    campaign.userIdsFunded[_twitterUserId] = true;
 
     campaign.totalValue -= campaign.valuePerShare + campaign.feePerShare;
     campaign.totalFees += campaign.feePerShare;
@@ -163,10 +178,11 @@ contract Crypto4You is Ownable {
       "Campaign has no funds"
     );
     campaign.paused = false;
-    emit CampaignStarted(_campaignId);
+    emit CampaignResumed(_campaignId);
   }
 
   function pauseCampaign(uint256 _campaignId) public onlyCreator(_campaignId) {
+    require(!campaigns[_campaignId].paused, "Campaign is already paused");
     _pauseCampaign(_campaignId);
   }
 
@@ -241,7 +257,7 @@ contract Crypto4You is Ownable {
   }
 
   // Batch withdraw fees from campaign array
-  function batchWithdrawFees(uint256[] memory _campaignIds) public onlyOwner {
+  function batchWithdrawFees(uint256[] calldata _campaignIds) public onlyOwner {
     for (uint256 i = 0; i < _campaignIds.length; i++) {
       withdrawFees(_campaignIds[i]);
     }
