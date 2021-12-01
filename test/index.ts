@@ -6,7 +6,7 @@ import { Crypto4You, TestToken } from "../typechain";
 // eslint-disable-next-line node/no-missing-import
 import { Campaign, generateCampaign } from "./util";
 
-describe("Fee Percentage", () => {
+describe("Contract Management", () => {
   let instance: Crypto4You;
   let anotherAccount: SignerWithAddress;
   // Deploy the contract
@@ -17,6 +17,8 @@ describe("Fee Percentage", () => {
     instance = await Crypto4You.deploy(owner.address, 5000);
     await instance.deployed();
   });
+
+  // FEE PERCENTAGE
 
   it("should update fee percentage correctly", async () => {
     const setFeePertcentageTx = await instance.setFeePercentage(1000);
@@ -40,33 +42,21 @@ describe("Fee Percentage", () => {
       "Ownable: caller is not the owner"
     );
   });
-});
 
-describe("Executor Update", () => {
-  let instance: Crypto4You;
-  let anotherExecutor: SignerWithAddress;
-  // Deploy the contract
-  before(async () => {
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
-    let owner: SignerWithAddress;
-    [owner, anotherExecutor] = await ethers.getSigners();
-    instance = await Crypto4You.deploy(owner.address, 5000);
-    await instance.deployed();
-  });
-
+  // EXECUTOR UPDATE
   it("should update the executor", async () => {
     const updateExecutorTx = await instance.updateExecutor(
-      anotherExecutor.address
+      anotherAccount.address
     );
     await updateExecutorTx.wait();
 
-    expect(await instance.executor()).to.equal(anotherExecutor.address);
+    expect(await instance.executor()).to.equal(anotherAccount.address);
   });
 
   it("shouldn't update executor if not owner", async () => {
     const updateExecutorTx = instance
-      .connect(anotherExecutor)
-      .updateExecutor(anotherExecutor.address);
+      .connect(anotherAccount)
+      .updateExecutor(anotherAccount.address);
 
     await expect(updateExecutorTx).to.be.revertedWith(
       "Ownable: caller is not the owner"
@@ -226,74 +216,7 @@ describe("Create Campaign", () => {
   });
 });
 
-// describe("Fund Campaign", () => {
-//   let instance: Crypto4You;
-//   let creator: SignerWithAddress;
-//   let erc20: TestToken;
-//   let campaignId: number;
-//   let feePercentage: number;
-//   let campaign: Campaign;
-//   before(async () => {
-//     campaignId = 0;
-//     const Crypto4You = await ethers.getContractFactory("Crypto4You");
-//     const TestToken = await ethers.getContractFactory("TestToken");
-//     let owner: SignerWithAddress;
-//     [owner, creator] = await ethers.getSigners();
-
-//     instance = await Crypto4You.deploy(owner.address, 5000);
-//     await instance.deployed();
-
-//     erc20 = await TestToken.deploy();
-//     await erc20.deployed();
-
-//     feePercentage = (await instance.feePercentage()).toNumber();
-//   });
-//   beforeEach(async () => {
-//     campaign = generateCampaign(
-//       campaignId++,
-//       creator.address,
-//       erc20.address,
-//       feePercentage
-//     );
-//     const mintTx = await erc20.mint(creator.address, campaign.totalValue); // 21 million
-//     await mintTx.wait();
-//     const approveTx = await erc20
-//       .connect(creator)
-//       .approve(instance.address, campaign.totalValue);
-//     await approveTx.wait();
-//     const createCampaignTx = await instance
-//       .connect(creator)
-//       .createCampaign(
-//         campaign.id,
-//         campaign.tokenAddress,
-//         campaign.valuePerShare,
-//         campaign.totalValue
-//       );
-//     await createCampaignTx.wait();
-//   });
-//   it("should fund campaign", async () => {
-//     const fundCampaignTx = await instance
-//       .connect(creator)
-//       .fundCampaign(campaign.id, campaign.totalValue);
-
-//     expect(fundCampaignTx)
-//       .to.emit(instance, "CampaignFunded")
-//       .withArgs(campaign.id, campaign.totalValue);
-
-//     const fundedCampaign = await instance.campaigns(campaign.id);
-//     expect(fundedCampaign.totalFees).to.be.equal(
-//       campaign.returningTotalFees
-//     );
-//     expect(fundedCampaign.valuePerShare).to.be.equal(
-//       campaign.returningValuePerShare
-//     );
-//     expect(fundedCampaign.feePerShare).to.be.equal(
-//       campaign.returningFeePerShare
-//     );
-//   });
-// });
-
-describe("Withdraw Campaign", () => {
+describe("Campaign Created", () => {
   let instance: Crypto4You;
   let creator: SignerWithAddress;
   let erc20: TestToken;
@@ -338,6 +261,31 @@ describe("Withdraw Campaign", () => {
       );
     await createCampaignTx.wait();
   });
+  // FUND
+  it("should fund campaign", async () => {
+    const campaignBefore = await instance.campaigns(campaign.id);
+    const valueToFund = campaign.valuePerShare;
+    const mintTx = await erc20.mint(creator.address, valueToFund); // 21 million
+    await mintTx.wait();
+    const approveTx = await erc20
+      .connect(creator)
+      .approve(instance.address, valueToFund);
+    await approveTx.wait();
+    const fundCampaignTx = await instance
+      .connect(creator)
+      .fundCampaign(campaign.id, valueToFund);
+
+    expect(fundCampaignTx)
+      .to.emit(instance, "CampaignFunded")
+      .withArgs(campaign.id, valueToFund);
+
+    const campaignAfter = await instance.campaigns(campaign.id);
+    expect(campaignAfter.totalValue).to.be.equal(
+      campaign.totalValue + valueToFund
+    );
+  });
+
+  // WITHDRAW
   it("should withdraw funds from campaign", async () => {
     const balanceBefore = await erc20.balanceOf(creator.address);
 
@@ -417,52 +365,7 @@ describe("Withdraw Campaign", () => {
     );
     expect(campaignContract.paused).to.be.equal(true);
   });
-});
-describe("Pause Campaign", () => {
-  let instance: Crypto4You;
-  let creator: SignerWithAddress;
-  let erc20: TestToken;
-  let campaignId: number;
-  let feePercentage: number;
-  let campaign: Campaign;
-  before(async () => {
-    campaignId = 0;
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
-    const TestToken = await ethers.getContractFactory("TestToken");
-    let owner: SignerWithAddress;
-    [owner, creator] = await ethers.getSigners();
-
-    instance = await Crypto4You.deploy(owner.address, 5000);
-    await instance.deployed();
-
-    erc20 = await TestToken.deploy();
-    await erc20.deployed();
-
-    feePercentage = (await instance.feePercentage()).toNumber();
-  });
-  beforeEach(async () => {
-    campaign = generateCampaign(
-      campaignId++,
-      creator.address,
-      erc20.address,
-      feePercentage
-    );
-    const mintTx = await erc20.mint(creator.address, campaign.totalValue); // 21 million
-    await mintTx.wait();
-    const approveTx = await erc20
-      .connect(creator)
-      .approve(instance.address, campaign.totalValue);
-    await approveTx.wait();
-    const createCampaignTx = await instance
-      .connect(creator)
-      .createCampaign(
-        campaign.id,
-        campaign.tokenAddress,
-        campaign.valuePerShare,
-        campaign.totalValue
-      );
-    await createCampaignTx.wait();
-  });
+  // PAUSE
   it("should pause campaign", async () => {
     const pauseCampaignTx = await instance
       .connect(creator)
@@ -491,53 +394,7 @@ describe("Pause Campaign", () => {
     const pausedCampaign = await instance.campaigns(campaign.id);
     expect(pausedCampaign.paused).to.be.equal(true);
   });
-});
-
-describe("Resume campaign", () => {
-  let instance: Crypto4You;
-  let creator: SignerWithAddress;
-  let erc20: TestToken;
-  let campaignId: number;
-  let feePercentage: number;
-  let campaign: Campaign;
-  before(async () => {
-    campaignId = 0;
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
-    const TestToken = await ethers.getContractFactory("TestToken");
-    let owner: SignerWithAddress;
-    [owner, creator] = await ethers.getSigners();
-
-    instance = await Crypto4You.deploy(owner.address, 5000);
-    await instance.deployed();
-
-    erc20 = await TestToken.deploy();
-    await erc20.deployed();
-
-    feePercentage = (await instance.feePercentage()).toNumber();
-  });
-  beforeEach(async () => {
-    campaign = generateCampaign(
-      campaignId++,
-      creator.address,
-      erc20.address,
-      feePercentage
-    );
-    const mintTx = await erc20.mint(creator.address, campaign.totalValue); // 21 million
-    await mintTx.wait();
-    const approveTx = await erc20
-      .connect(creator)
-      .approve(instance.address, campaign.totalValue);
-    await approveTx.wait();
-    const createCampaignTx = await instance
-      .connect(creator)
-      .createCampaign(
-        campaign.id,
-        campaign.tokenAddress,
-        campaign.valuePerShare,
-        campaign.totalValue
-      );
-    await createCampaignTx.wait();
-  });
+  // RESUME
   it("should resume campaign", async () => {
     const pauseCampaignTx = await instance
       .connect(creator)
