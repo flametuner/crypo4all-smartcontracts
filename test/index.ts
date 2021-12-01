@@ -281,7 +281,7 @@ describe("Campaign Created", () => {
 
     const campaignAfter = await instance.campaigns(campaign.id);
     expect(campaignAfter.totalValue).to.be.equal(
-      campaign.totalValue + valueToFund
+      campaignBefore.totalValue.add(valueToFund)
     );
   });
 
@@ -450,6 +450,7 @@ describe("Campaign Created", () => {
     const pausedCampaign = await instance.campaigns(campaign.id);
     expect(pausedCampaign.paused).to.be.equal(true);
   });
+  // AUTO PAUSE
 });
 
 describe("Check tweets", () => {
