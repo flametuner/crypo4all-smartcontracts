@@ -15,8 +15,8 @@ export const generateCampaign = (
   creator: string,
   tokenAddress: string,
   feePercentage: number,
-  minValuePerShare: number = 100,
-  minShares: number = 1
+  minShares: number = 1,
+  minValuePerShare: number = 100
 ): Campaign => {
   const valuePerShare = minValuePerShare + Math.floor(Math.random() * 100000);
   const totalValue =

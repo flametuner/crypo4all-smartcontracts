@@ -14,7 +14,7 @@ describe("Contract Management", () => {
     const Crypto4You = await ethers.getContractFactory("Crypto4You");
     let owner: SignerWithAddress;
     [owner, anotherAccount] = await ethers.getSigners();
-    instance = await Crypto4You.deploy(owner.address, 5000);
+    instance = await Crypto4You.deploy(owner.address, 500);
     await instance.deployed();
   });
 
@@ -69,7 +69,7 @@ describe("Create Campaign", () => {
   let executor: SignerWithAddress;
   let creator: SignerWithAddress;
   let erc20: TestToken;
-  let campaignId: number;
+  let campaignId: number = 0;
   let feePercentage: number;
   let campaign: Campaign;
 
@@ -78,13 +78,12 @@ describe("Create Campaign", () => {
     const TestToken = await ethers.getContractFactory("TestToken");
     [, executor, creator] = await ethers.getSigners();
 
-    instance = await Crypto4You.deploy(executor.address, 5000);
+    instance = await Crypto4You.deploy(executor.address, 500);
     await instance.deployed();
 
     erc20 = await TestToken.deploy();
     await erc20.deployed();
 
-    campaignId = 0;
     feePercentage = (await instance.feePercentage()).toNumber();
   });
 
@@ -182,8 +181,8 @@ describe("Create Campaign", () => {
       .createCampaign(
         campaign.id,
         campaign.tokenAddress,
-        campaign.totalValue,
-        campaign.valuePerShare
+        campaign.totalValue + 1,
+        campaign.totalValue
       );
 
     await expect(createCampaignTx).to.be.revertedWith(
@@ -220,17 +219,16 @@ describe("Campaign Created", () => {
   let instance: Crypto4You;
   let creator: SignerWithAddress;
   let erc20: TestToken;
-  let campaignId: number;
+  let campaignId: number = 0;
   let feePercentage: number;
   let campaign: Campaign;
   before(async () => {
-    campaignId = 0;
     const Crypto4You = await ethers.getContractFactory("Crypto4You");
     const TestToken = await ethers.getContractFactory("TestToken");
     let owner: SignerWithAddress;
     [owner, creator] = await ethers.getSigners();
 
-    instance = await Crypto4You.deploy(owner.address, 5000);
+    instance = await Crypto4You.deploy(owner.address, 500);
     await instance.deployed();
 
     erc20 = await TestToken.deploy();
@@ -283,6 +281,21 @@ describe("Campaign Created", () => {
     expect(campaignAfter.totalValue).to.be.equal(
       campaignBefore.totalValue.add(valueToFund)
     );
+  });
+  it("shouldn't fund campaign if not creator", async () => {
+    const anotherAccount = (await ethers.getSigners())[3];
+    const valueToFund = campaign.valuePerShare;
+    const mintTx = await erc20.mint(anotherAccount.address, valueToFund); // 21 million
+    await mintTx.wait();
+    const approveTx = await erc20
+      .connect(anotherAccount)
+      .approve(instance.address, valueToFund);
+    await approveTx.wait();
+    const fundCampaignTx = instance
+      .connect(anotherAccount)
+      .fundCampaign(campaign.id, valueToFund);
+
+    await expect(fundCampaignTx).to.be.revertedWith("Only creator");
   });
 
   // WITHDRAW
@@ -450,7 +463,51 @@ describe("Campaign Created", () => {
     const pausedCampaign = await instance.campaigns(campaign.id);
     expect(pausedCampaign.paused).to.be.equal(true);
   });
-  // AUTO PAUSE
+  // UPDATE VALUE PER SHARE
+  it("should update value per share", async () => {
+    const newValuePerShare = campaign.valuePerShare * 2;
+    const updateValuePerShareTx = await instance
+      .connect(creator)
+      .updateValuePerShare(campaign.id, newValuePerShare);
+    expect(updateValuePerShareTx)
+      .to.emit(instance, "CampaignValuePerShareUpdated")
+      .withArgs(campaign.id, newValuePerShare);
+    const newFeePerShare = Math.floor(
+      (feePercentage * newValuePerShare) / 10000
+    );
+
+    const campaignContract = await instance.campaigns(campaign.id);
+    expect(campaignContract.valuePerShare).to.be.equal(
+      newValuePerShare - newFeePerShare
+    );
+    expect(campaignContract.feePerShare).to.be.equal(newFeePerShare);
+  });
+  it("shouldn't update value per share if value equal 0", async () => {
+    const newValuePerShare = 0;
+    const updateValuePerShareTx = instance
+      .connect(creator)
+      .updateValuePerShare(campaign.id, newValuePerShare);
+    await expect(updateValuePerShareTx).to.be.revertedWith(
+      "Value must be greater than 0"
+    );
+    const campaignContract = await instance.campaigns(campaign.id);
+    expect(campaignContract.valuePerShare).to.be.equal(
+      campaign.returningValuePerShare
+    );
+  });
+  it("shouldn't update the value per share if value greater than total value", async () => {
+    const newValuePerShare = campaign.totalValue + 1;
+    const updateValuePerShareTx = instance
+      .connect(creator)
+      .updateValuePerShare(campaign.id, newValuePerShare);
+    await expect(updateValuePerShareTx).to.be.revertedWith(
+      "Invalid Value per share"
+    );
+    const campaignContract = await instance.campaigns(campaign.id);
+    expect(campaignContract.valuePerShare).to.be.equal(
+      campaign.returningValuePerShare
+    );
+  });
 });
 
 describe("Check tweets", () => {
@@ -460,28 +517,31 @@ describe("Check tweets", () => {
   let user: SignerWithAddress;
   let erc20: TestToken;
   let campaign: Campaign;
-  let userIdCounter: number;
+  let feePercentage: number;
+  let userIdCounter: number = 0;
+  let campaignId: number = 0;
 
   before(async () => {
-    userIdCounter = 0;
-    const campaignId = 0;
     const Crypto4You = await ethers.getContractFactory("Crypto4You");
     const TestToken = await ethers.getContractFactory("TestToken");
     [owner, creator, user] = await ethers.getSigners();
 
-    instance = await Crypto4You.deploy(owner.address, 5000);
+    instance = await Crypto4You.deploy(owner.address, 500);
     await instance.deployed();
 
     erc20 = await TestToken.deploy();
     await erc20.deployed();
 
-    const feePercentage = (await instance.feePercentage()).toNumber();
+    feePercentage = (await instance.feePercentage()).toNumber();
+  });
 
+  beforeEach(async () => {
     campaign = generateCampaign(
-      campaignId,
+      campaignId++,
       creator.address,
       erc20.address,
-      feePercentage
+      feePercentage,
+      100
     );
     const mintTx = await erc20.mint(creator.address, campaign.totalValue); // 21 million
     await mintTx.wait();
@@ -594,8 +654,237 @@ describe("Check tweets", () => {
 
     await expect(checkTweetTx).to.be.revertedWith("Campaign is paused");
   });
-});
+  // AUTO PAUSE
+  it("should auto pause in check tweet if total value goes below value per share", async () => {
+    const withdrawValue = campaign.totalValue - campaign.valuePerShare * 2 + 1;
+    const withdrawTx = await instance
+      .connect(creator)
+      .withdrawFunds(campaign.id, withdrawValue);
+    await withdrawTx.wait();
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId,
+      "tweet_url"
+    );
 
-// update value per share
-// withdraw fees
-// batches
+    await expect(checkTweetTx)
+      .to.emit(instance, "CampaignPaused")
+      .withArgs(campaign.id);
+
+    const campaignAfter = await instance.campaigns(campaign.id);
+    expect(campaignAfter.paused).to.be.equal(true);
+  });
+  it("shouldn't auto pause in check tweet if total value goes above value per share", async () => {
+    const withdrawValue = campaign.totalValue - campaign.valuePerShare * 2 - 1;
+    const withdrawTx = await instance
+      .connect(creator)
+      .withdrawFunds(campaign.id, withdrawValue);
+    await withdrawTx.wait();
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId,
+      "tweet_url"
+    );
+
+    await expect(checkTweetTx).to.not.emit(instance, "CampaignPaused");
+
+    const campaignAfter = await instance.campaigns(campaign.id);
+    expect(campaignAfter.paused).to.be.equal(false);
+  });
+  // BATCH TWEETS
+  it("should check tweets in batch", async () => {
+    const total = 10;
+    const campaignIds = [];
+    const userAddress = [];
+    const usersIds = [];
+    const tweetsUrls = [];
+
+    for (let i = 0; i < total; i++) {
+      const addr = (await ethers.getSigners())[10 + i].address;
+      usersIds.push(`random_id_${userIdCounter++}`);
+      userAddress.push(addr);
+      tweetsUrls.push("tweet_url");
+      campaignIds.push(campaign.id);
+    }
+    const checkTweetTx = await instance.batchCheckTweets(
+      campaignIds,
+      userAddress,
+      usersIds,
+      tweetsUrls
+    );
+    for (let i = 0; i < total; i++) {
+      expect(checkTweetTx)
+        .to.emit(instance, "UserFunded")
+        .withArgs(campaign.id, userAddress[i], tweetsUrls[i]);
+      const balance = await erc20.balanceOf(userAddress[i]);
+      expect(balance).to.be.equal(campaign.returningValuePerShare);
+    }
+    const campaignAfter = await instance.campaigns(campaign.id);
+    expect(campaignAfter.totalFees).to.be.equal(
+      campaign.returningFeePerShare * total
+    );
+    expect(campaignAfter.totalValue).to.be.equal(
+      campaign.totalValue - campaign.valuePerShare * total
+    );
+    expect(campaignAfter.totalFees).to.be.equal(
+      campaign.returningFeePerShare * total
+    );
+  });
+});
+describe("Withdraw funds", () => {
+  let instance: Crypto4You;
+  let owner: SignerWithAddress;
+  let creator: SignerWithAddress;
+  let user: SignerWithAddress;
+  let erc20: TestToken;
+  let campaign: Campaign;
+  let feePercentage: number;
+  let userIdCounter: number = 0;
+  let campaignId: number = 0;
+
+  before(async () => {
+    const Crypto4You = await ethers.getContractFactory("Crypto4You");
+    const TestToken = await ethers.getContractFactory("TestToken");
+    [owner, creator, user] = await ethers.getSigners();
+
+    instance = await Crypto4You.deploy(owner.address, 500);
+    await instance.deployed();
+
+    erc20 = await TestToken.deploy();
+    await erc20.deployed();
+
+    feePercentage = (await instance.feePercentage()).toNumber();
+  });
+
+  beforeEach(async () => {
+    campaign = generateCampaign(
+      campaignId++,
+      creator.address,
+      erc20.address,
+      feePercentage
+    );
+    const mintTx = await erc20.mint(creator.address, campaign.totalValue); // 21 million
+    await mintTx.wait();
+    const approveTx = await erc20
+      .connect(creator)
+      .approve(instance.address, campaign.totalValue);
+    await approveTx.wait();
+    const createCampaignTx = await instance
+      .connect(creator)
+      .createCampaign(
+        campaign.id,
+        campaign.tokenAddress,
+        campaign.valuePerShare,
+        campaign.totalValue
+      );
+    await createCampaignTx.wait();
+  });
+  it("should be able to withdraw fees", async () => {
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = await instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId,
+      "tweet_url"
+    );
+    await checkTweetTx.wait();
+    const campaignBefore = await instance.campaigns(campaign.id);
+    const balanceBefore = await erc20.balanceOf(owner.address);
+    expect(campaignBefore.totalFees.toNumber()).to.be.greaterThan(0);
+    const withdrawFeesTx = await instance.withdrawFees(campaign.id);
+    await withdrawFeesTx.wait();
+    const campaignAfter = await instance.campaigns(campaign.id);
+    const balanceAfter = await erc20.balanceOf(owner.address);
+    expect(campaignAfter.totalFees).to.be.equal(0);
+    expect(balanceAfter).to.be.equal(
+      balanceBefore.add(campaignBefore.totalFees)
+    );
+  });
+  it("shouldn't withdraw fees if not owner", async () => {
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = await instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId,
+      "tweet_url"
+    );
+    await checkTweetTx.wait();
+    const campaignBefore = await instance.campaigns(campaign.id);
+    const balanceBefore = await erc20.balanceOf(creator.address);
+    expect(campaignBefore.totalFees.toNumber()).to.be.greaterThan(0);
+    const withdrawFeesTx = instance.connect(creator).withdrawFees(campaign.id);
+    await expect(withdrawFeesTx).to.be.revertedWith(
+      "Ownable: caller is not the owner"
+    );
+    const campaignAfter = await instance.campaigns(campaign.id);
+    const balanceAfter = await erc20.balanceOf(creator.address);
+    expect(campaignAfter.totalFees).to.be.equal(campaignBefore.totalFees);
+    expect(balanceAfter).to.be.equal(balanceBefore);
+  });
+  it("shouldn't withdraw fees if fees are equal 0", async () => {
+    const campaignBefore = await instance.campaigns(campaign.id);
+    const balanceBefore = await erc20.balanceOf(owner.address);
+    expect(campaignBefore.totalFees).to.be.equal(0);
+    const withdrawFeesTx = instance.withdrawFees(campaign.id);
+    await expect(withdrawFeesTx).to.be.revertedWith(
+      "Fee must be greater than 0"
+    );
+    const campaignAfter = await instance.campaigns(campaign.id);
+    const balanceAfter = await erc20.balanceOf(owner.address);
+    expect(campaignAfter.totalFees).to.be.equal(campaignBefore.totalFees);
+    expect(balanceAfter).to.be.equal(balanceBefore);
+  });
+  // BATCH WITHDRAW FEES
+  it("should be able to batch withdraw fees", async () => {
+    const total = 10;
+    const campaignIds = [];
+    const userAddress = [];
+    const usersIds = [];
+    const tweetsUrls = [];
+
+    for (let i = 0; i < total; i++) {
+      const campaign = generateCampaign(
+        campaignId++,
+        creator.address,
+        erc20.address,
+        feePercentage
+      );
+      const mintTx = await erc20.mint(creator.address, campaign.totalValue); // 21 million
+      await mintTx.wait();
+      const approveTx = await erc20
+        .connect(creator)
+        .approve(instance.address, campaign.totalValue);
+      await approveTx.wait();
+      const createCampaignTx = await instance
+        .connect(creator)
+        .createCampaign(
+          campaign.id,
+          campaign.tokenAddress,
+          campaign.valuePerShare,
+          campaign.totalValue
+        );
+      await createCampaignTx.wait();
+      userAddress.push(user.address);
+      campaignIds.push(campaign.id);
+      usersIds.push("random_id_0");
+      tweetsUrls.push("tweet_url");
+    }
+    const batchCheckTweetsTx = await instance.batchCheckTweets(
+      campaignIds,
+      userAddress,
+      usersIds,
+      tweetsUrls
+    );
+    await batchCheckTweetsTx.wait();
+    const batchWithdrawFeesTx = await instance.batchWithdrawFees(campaignIds);
+    await batchWithdrawFeesTx.wait();
+    for (let i = 0; i < total; i++) {
+      const campaignAfter = await instance.campaigns(campaignIds[i]);
+      expect(campaignAfter.totalFees).to.be.equal(0);
+    }
+  });
+});

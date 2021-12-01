@@ -57,8 +57,8 @@ contract Crypto4You is Ownable {
   }
 
   constructor(address _executor, uint256 _feePercentage) {
-    executor = _executor;
-    feePercentage = _feePercentage;
+    updateExecutor(_executor);
+    setFeePercentage(_feePercentage);
   }
 
   function addressFunded(uint256 campaignId, address user)
@@ -120,7 +120,7 @@ contract Crypto4You is Ownable {
   }
 
   function batchCheckTweets(
-    uint256 _campaignId,
+    uint256[] calldata _campaignId,
     address[] calldata _users,
     string[] calldata _userIdsFunded,
     string[] calldata _tweetUrls
@@ -131,7 +131,7 @@ contract Crypto4You is Ownable {
       "must have the same length"
     );
     for (uint256 i = 0; i < _users.length; i++) {
-      checkTweet(_campaignId, _users[i], _userIdsFunded[i], _tweetUrls[i]);
+      checkTweet(_campaignId[i], _users[i], _userIdsFunded[i], _tweetUrls[i]);
     }
   }
 
@@ -249,7 +249,7 @@ contract Crypto4You is Ownable {
   // Permit owner to withdraw fees from specific campaign
   function withdrawFees(uint256 _campaignId) public onlyOwner {
     Campaign storage campaign = campaigns[_campaignId];
-    require(campaign.totalFees > 0, "Amount must be greater than 0");
+    require(campaign.totalFees > 0, "Fee must be greater than 0");
 
     uint256 totalFees = campaign.totalFees;
     campaign.totalFees = 0;
