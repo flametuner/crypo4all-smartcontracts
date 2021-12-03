@@ -12,10 +12,14 @@ async function main() {
   // If this script is run directly using `node` you may want to call compile
   // manually to make sure everything is compiled
   // await hre.run('compile');
+  const [deployer] = await ethers.getSigners();
 
+  console.log(
+    `Deploying contract with params Executor: ${deployer.address}, Fee: 5%`
+  );
   // We get the contract to deploy
   const Crypto4You = await ethers.getContractFactory("Crypto4You");
-  const instance = await Crypto4You.deploy("0x0", 5000);
+  const instance = await Crypto4You.deploy(deployer.address, 500);
 
   await instance.deployed();
 
