@@ -126,8 +126,9 @@ contract Crypto4You is Ownable {
     string[] calldata _tweetUrls
   ) public onlyExecutor {
     require(
+      _campaignId.length == _users.length &&
       _users.length == _userIdsFunded.length &&
-        _users.length == _tweetUrls.length,
+        _userIdsFunded.length == _tweetUrls.length,
       "must have the same length"
     );
     for (uint256 i = 0; i < _users.length; i++) {

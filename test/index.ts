@@ -134,7 +134,41 @@ describe("Create Campaign", () => {
       campaign.returningFeePerShare
     );
   });
+  it("shouldn't create campaign if already created", async () => {
+    const approveTx = await erc20
+      .connect(creator)
+      .approve(instance.address, campaign.totalValue);
+    await approveTx.wait();
 
+    const createCampaignTx = await instance
+      .connect(creator)
+      .createCampaign(
+        campaign.id,
+        campaign.tokenAddress,
+        campaign.valuePerShare,
+        campaign.totalValue
+      );
+
+    expect(createCampaignTx)
+      .to.emit(instance, "CampaignCreated")
+      .withArgs(
+        campaign.id,
+        campaign.tokenAddress,
+        campaign.returningValuePerShare,
+        campaign.totalValue
+      );
+    const createCampaignAgainTx = instance
+      .connect(creator)
+      .createCampaign(
+        campaign.id,
+        campaign.tokenAddress,
+        campaign.valuePerShare,
+        campaign.totalValue
+      );
+    await expect(createCampaignAgainTx).to.be.revertedWith(
+      "Campaign already created"
+    );
+  });
   it("shouldn't create campaign if not approved", async () => {
     const createCampaignTx = instance
       .connect(creator)
@@ -296,6 +330,17 @@ describe("Campaign Created", () => {
       .fundCampaign(campaign.id, valueToFund);
 
     await expect(fundCampaignTx).to.be.revertedWith("Only creator");
+  });
+
+  it("shouldn't fund campaign if not approved", async () => {
+    const valueToFund = campaign.valuePerShare;
+    const mintTx = await erc20.mint(creator.address, valueToFund); // 21 million
+    await mintTx.wait();
+    const fundCampaignTx = instance
+      .connect(creator)
+      .fundCampaign(campaign.id, valueToFund);
+
+    await expect(fundCampaignTx).to.be.reverted;
   });
 
   // WITHDRAW
@@ -596,7 +641,6 @@ describe("Check tweets", () => {
     const userIdFunded = await instance.userIdFunded(campaign.id, userId);
     expect(userIdFunded).to.be.equal(true);
   });
-
   it("shouldn't check tweets by non executor", async () => {
     const userId = `random_id_${userIdCounter++}`;
     const checkTweetTx = instance
@@ -604,6 +648,17 @@ describe("Check tweets", () => {
       .checkTweet(campaign.id, user.address, userId, "tweet_url");
 
     await expect(checkTweetTx).to.be.revertedWith("Only executor");
+  });
+  it("shouldn't check tweets if user is 0x0", async () => {
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = instance.checkTweet(
+      campaign.id,
+      "0x0000000000000000000000000000000000000000",
+      userId,
+      "tweet_url"
+    );
+
+    await expect(checkTweetTx).to.revertedWith("User address must be valid");
   });
 
   it("shouldn't check tweets if campaign is not active", async () => {
@@ -653,6 +708,42 @@ describe("Check tweets", () => {
     );
 
     await expect(checkTweetTx).to.be.revertedWith("Campaign is paused");
+  });
+  it("shouldn't check tweets if user already funded", async () => {
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId,
+      "tweet_url"
+    );
+    expect(checkTweetTx).to.emit(instance, "UserFunded");
+    const userId2 = `random_id_${userIdCounter++}`;
+    const checkTweetAgainTx = instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId2,
+      "tweet_url"
+    );
+    await expect(checkTweetAgainTx).to.revertedWith("User already funded");
+  });
+  it("shouldn't check tweets if tweetUserId already funded", async () => {
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId,
+      "tweet_url"
+    );
+    expect(checkTweetTx).to.emit(instance, "UserFunded");
+    const user2 = (await ethers.getSigners())[3];
+    const checkTweetAgainTx = instance.checkTweet(
+      campaign.id,
+      user2.address,
+      userId,
+      "tweet_url"
+    );
+    await expect(checkTweetAgainTx).to.revertedWith("Tweet already used");
   });
   // AUTO PAUSE
   it("should auto pause in check tweet if total value goes below value per share", async () => {
@@ -733,6 +824,34 @@ describe("Check tweets", () => {
     expect(campaignAfter.totalFees).to.be.equal(
       campaign.returningFeePerShare * total
     );
+  });
+  it("shouldn't batch if different arrays length", async () => {
+    const total = 3;
+    const campaignIds = [];
+    const userAddress = [];
+    const usersIds = [];
+    const tweetsUrls = [];
+
+    for (let i = 0; i < total; i++) {
+      const addr = (await ethers.getSigners())[10 + i].address;
+      usersIds.push(`random_id_${userIdCounter++}`);
+      userAddress.push(addr);
+      tweetsUrls.push("tweet_url");
+      campaignIds.push(campaign.id);
+    }
+    userAddress.pop();
+    usersIds.pop();
+    usersIds.pop();
+    tweetsUrls.pop();
+    tweetsUrls.pop();
+    tweetsUrls.pop();
+    const checkTweetTx = instance.batchCheckTweets(
+      campaignIds,
+      userAddress,
+      usersIds,
+      tweetsUrls
+    );
+    await expect(checkTweetTx).to.be.revertedWith("must have the same length");
   });
 });
 describe("Withdraw funds", () => {
