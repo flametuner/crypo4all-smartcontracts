@@ -5,21 +5,21 @@ import { constants } from "ethers";
 import { sha256, toUtf8Bytes } from "ethers/lib/utils";
 import { ethers, waffle } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
-import { Crypto4You, TestToken } from "../typechain";
+import { Crypto4All, TestToken } from "../typechain";
 // eslint-disable-next-line node/no-missing-import
 import { Campaign, generateCampaign } from "./util";
 
 const provider = waffle.provider;
 
 describe("Contract Management", () => {
-  let instance: Crypto4You;
+  let instance: Crypto4All;
   let anotherAccount: SignerWithAddress;
   // Deploy the contract
   before(async () => {
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
+    const Crypto4All = await ethers.getContractFactory("Crypto4All");
     let owner: SignerWithAddress;
     [owner, anotherAccount] = await ethers.getSigners();
-    instance = await Crypto4You.deploy(owner.address, 500);
+    instance = await Crypto4All.deploy(owner.address, 500);
     await instance.deployed();
   });
 
@@ -70,7 +70,7 @@ describe("Contract Management", () => {
 });
 
 describe("Create Campaign", () => {
-  let instance: Crypto4You;
+  let instance: Crypto4All;
   let executor: SignerWithAddress;
   let creator: SignerWithAddress;
   let erc20: TestToken;
@@ -78,11 +78,11 @@ describe("Create Campaign", () => {
   let campaign: Campaign;
 
   before(async () => {
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
+    const Crypto4All = await ethers.getContractFactory("Crypto4All");
     const TestToken = await ethers.getContractFactory("TestToken");
     [, executor, creator] = await ethers.getSigners();
 
-    instance = await Crypto4You.deploy(executor.address, 500);
+    instance = await Crypto4All.deploy(executor.address, 500);
     await instance.deployed();
 
     erc20 = await TestToken.deploy();
@@ -293,18 +293,18 @@ describe("Create Campaign", () => {
 });
 
 describe("Campaign Created", () => {
-  let instance: Crypto4You;
+  let instance: Crypto4All;
   let creator: SignerWithAddress;
   let erc20: TestToken;
   let feePercentage: number;
   let campaign: Campaign;
   before(async () => {
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
+    const Crypto4All = await ethers.getContractFactory("Crypto4All");
     const TestToken = await ethers.getContractFactory("TestToken");
     let owner: SignerWithAddress;
     [owner, creator] = await ethers.getSigners();
 
-    instance = await Crypto4You.deploy(owner.address, 500);
+    instance = await Crypto4All.deploy(owner.address, 500);
     await instance.deployed();
 
     erc20 = await TestToken.deploy();
@@ -598,7 +598,7 @@ describe("Campaign Created", () => {
 });
 
 describe("Check tweets", () => {
-  let instance: Crypto4You;
+  let instance: Crypto4All;
   let owner: SignerWithAddress;
   let creator: SignerWithAddress;
   let user: SignerWithAddress;
@@ -608,11 +608,11 @@ describe("Check tweets", () => {
   let userIdCounter: number = 0;
 
   before(async () => {
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
+    const Crypto4All = await ethers.getContractFactory("Crypto4All");
     const TestToken = await ethers.getContractFactory("TestToken");
     [owner, creator, user] = await ethers.getSigners();
 
-    instance = await Crypto4You.deploy(owner.address, 500);
+    instance = await Crypto4All.deploy(owner.address, 500);
     await instance.deployed();
 
     erc20 = await TestToken.deploy();
@@ -659,7 +659,13 @@ describe("Check tweets", () => {
 
     expect(checkTweetTx)
       .to.emit(instance, "UserFunded")
-      .withArgs(campaign.id, user.address, "tweet_url");
+      .withArgs(
+        campaign.id,
+        user.address,
+        userId,
+        "tweet_url",
+        campaign.returningValuePerShare
+      );
 
     const balanceAfter = await erc20.balanceOf(user.address);
     const campaignAfter = await instance.campaigns(campaign.id);
@@ -851,7 +857,13 @@ describe("Check tweets", () => {
     for (let i = 0; i < total; i++) {
       expect(checkTweetTx)
         .to.emit(instance, "UserFunded")
-        .withArgs(campaign.id, userAddress[i], tweetsUrls[i]);
+        .withArgs(
+          campaign.id,
+          userAddress[i],
+          usersIds[i],
+          tweetsUrls[i],
+          campaign.returningValuePerShare
+        );
       const balance = await erc20.balanceOf(userAddress[i]);
       expect(balance).to.be.equal(campaign.returningValuePerShare);
     }
@@ -896,7 +908,7 @@ describe("Check tweets", () => {
   });
 });
 describe("Withdraw funds", () => {
-  let instance: Crypto4You;
+  let instance: Crypto4All;
   let owner: SignerWithAddress;
   let creator: SignerWithAddress;
   let user: SignerWithAddress;
@@ -906,11 +918,11 @@ describe("Withdraw funds", () => {
   let userIdCounter: number = 0;
 
   before(async () => {
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
+    const Crypto4All = await ethers.getContractFactory("Crypto4All");
     const TestToken = await ethers.getContractFactory("TestToken");
     [owner, creator, user] = await ethers.getSigners();
 
-    instance = await Crypto4You.deploy(owner.address, 500);
+    instance = await Crypto4All.deploy(owner.address, 500);
     await instance.deployed();
 
     erc20 = await TestToken.deploy();
@@ -1048,7 +1060,7 @@ describe("Withdraw funds", () => {
   });
 });
 describe("Native token", () => {
-  let instance: Crypto4You;
+  let instance: Crypto4All;
   let owner: SignerWithAddress;
   let creator: SignerWithAddress;
   let user: SignerWithAddress;
@@ -1058,11 +1070,11 @@ describe("Native token", () => {
   let userIdCounter: number = 0;
 
   before(async () => {
-    const Crypto4You = await ethers.getContractFactory("Crypto4You");
+    const Crypto4All = await ethers.getContractFactory("Crypto4All");
     const TestToken = await ethers.getContractFactory("TestToken");
     [owner, creator, user] = await ethers.getSigners();
 
-    instance = await Crypto4You.deploy(owner.address, 500);
+    instance = await Crypto4All.deploy(owner.address, 500);
     await instance.deployed();
 
     erc20 = await TestToken.deploy();
@@ -1109,7 +1121,13 @@ describe("Native token", () => {
 
     expect(checkTweetTx)
       .to.emit(instance, "UserFunded")
-      .withArgs(campaign.id, user.address, "tweet_url");
+      .withArgs(
+        campaign.id,
+        user.address,
+        userId,
+        "tweet_url",
+        campaign.returningValuePerShare
+      );
 
     const balanceAfter = await user.getBalance();
     expect(balanceAfter).to.be.equal(

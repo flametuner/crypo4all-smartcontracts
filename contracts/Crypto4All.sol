@@ -5,7 +5,7 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Crypto4You is Ownable {
+contract Crypto4All is Ownable {
   uint256 public constant INVERSE_BASIS = 10000;
   uint256 public feePercentage = 1000;
 
@@ -31,7 +31,9 @@ contract Crypto4You is Ownable {
   event UserFunded(
     bytes32 indexed campaignId,
     address indexed user,
-    string tweetUrl
+    string twitterUserId,
+    string tweetUrl,
+    uint256 amount
   );
 
   struct Campaign {
@@ -176,7 +178,7 @@ contract Crypto4You is Ownable {
       (success, ) = _user.call{ value: campaign.valuePerShare }("");
     }
 
-    emit UserFunded(_campaignId, _user, _tweetUrl);
+    emit UserFunded(_campaignId, _user, _twitterUserId, _tweetUrl, campaign.valuePerShare);
 
     verifyForPausing(_campaignId);
   }
