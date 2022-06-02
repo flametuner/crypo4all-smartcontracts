@@ -6,8 +6,8 @@ const newExecutor = process.env.EXECUTOR_ADDRESS || "";
 async function main() {
   console.log(`Updating executor to: ${newExecutor}`);
   // We get the contract to deploy
-  const Crypto4You = await ethers.getContractFactory("Crypto4You");
-  const instance = Crypto4You.attach(contractAddress);
+  const Crypto4All = await ethers.getContractFactory("Crypto4All");
+  const instance = Crypto4All.attach(contractAddress);
 
   const updateExecutorTx = await instance.updateExecutor(newExecutor);
   await updateExecutorTx.wait();

@@ -18,12 +18,12 @@ async function main() {
     `Deploying contract with params Executor: ${deployer.address}, Fee: 5%`
   );
   // We get the contract to deploy
-  const Crypto4You = await ethers.getContractFactory("Crypto4You");
-  const instance = await Crypto4You.deploy(deployer.address, 500);
+  const Crypto4All = await ethers.getContractFactory("Crypto4All");
+  const instance = await Crypto4All.deploy(deployer.address, 500);
 
   await instance.deployed();
 
-  console.log("Crypto4You deployed to:", instance.address);
+  console.log("Crypto4All deployed to:", instance.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere
