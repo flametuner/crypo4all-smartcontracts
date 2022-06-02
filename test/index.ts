@@ -1,6 +1,8 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
+import { randomUUID } from "crypto";
 import { constants } from "ethers";
+import { sha256, toUtf8Bytes } from "ethers/lib/utils";
 import { ethers, waffle } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
 import { Crypto4You, TestToken } from "../typechain";
@@ -72,7 +74,6 @@ describe("Create Campaign", () => {
   let executor: SignerWithAddress;
   let creator: SignerWithAddress;
   let erc20: TestToken;
-  let campaignId: number = 0;
   let feePercentage: number;
   let campaign: Campaign;
 
@@ -92,7 +93,7 @@ describe("Create Campaign", () => {
 
   beforeEach(async () => {
     campaign = generateCampaign(
-      campaignId++,
+      randomUUID(),
       creator.address,
       erc20.address,
       feePercentage
@@ -295,7 +296,6 @@ describe("Campaign Created", () => {
   let instance: Crypto4You;
   let creator: SignerWithAddress;
   let erc20: TestToken;
-  let campaignId: number = 0;
   let feePercentage: number;
   let campaign: Campaign;
   before(async () => {
@@ -314,7 +314,7 @@ describe("Campaign Created", () => {
   });
   beforeEach(async () => {
     campaign = generateCampaign(
-      campaignId++,
+      randomUUID(),
       creator.address,
       erc20.address,
       feePercentage
@@ -606,7 +606,6 @@ describe("Check tweets", () => {
   let campaign: Campaign;
   let feePercentage: number;
   let userIdCounter: number = 0;
-  let campaignId: number = 0;
 
   before(async () => {
     const Crypto4You = await ethers.getContractFactory("Crypto4You");
@@ -624,7 +623,7 @@ describe("Check tweets", () => {
 
   beforeEach(async () => {
     campaign = generateCampaign(
-      campaignId++,
+      randomUUID(),
       creator.address,
       erc20.address,
       feePercentage,
@@ -706,7 +705,7 @@ describe("Check tweets", () => {
   it("shouldn't check tweets if campaign is not active", async () => {
     const userId = `random_id_${userIdCounter++}`;
     const checkTweetTx = instance.checkTweet(
-      campaign.id + 1,
+      sha256(toUtf8Bytes(randomUUID())),
       user.address,
       userId,
       "tweet_url"
@@ -905,7 +904,6 @@ describe("Withdraw funds", () => {
   let campaign: Campaign;
   let feePercentage: number;
   let userIdCounter: number = 0;
-  let campaignId: number = 0;
 
   before(async () => {
     const Crypto4You = await ethers.getContractFactory("Crypto4You");
@@ -923,7 +921,7 @@ describe("Withdraw funds", () => {
 
   beforeEach(async () => {
     campaign = generateCampaign(
-      campaignId++,
+      randomUUID(),
       creator.address,
       erc20.address,
       feePercentage
@@ -1009,7 +1007,7 @@ describe("Withdraw funds", () => {
 
     for (let i = 0; i < total; i++) {
       const campaign = generateCampaign(
-        campaignId++,
+        randomUUID(),
         creator.address,
         erc20.address,
         feePercentage
@@ -1058,7 +1056,6 @@ describe("Native token", () => {
   let campaign: Campaign;
   let feePercentage: number;
   let userIdCounter: number = 0;
-  let campaignId: number = 0;
 
   before(async () => {
     const Crypto4You = await ethers.getContractFactory("Crypto4You");
@@ -1075,7 +1072,7 @@ describe("Native token", () => {
   });
   beforeEach(async () => {
     campaign = generateCampaign(
-      campaignId++,
+      randomUUID(),
       creator.address,
       erc20.address,
       feePercentage,

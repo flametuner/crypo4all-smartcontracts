@@ -1,7 +1,8 @@
-// Generate Campaign with id and token address, and return random value per share, total value
+import { sha256, toUtf8Bytes } from "ethers/lib/utils";
 
+// Generate Campaign with id and token address, and return random value per share, total value
 export type Campaign = {
-  id: number;
+  id: string;
   creator: string;
   tokenAddress: string;
   totalValue: number;
@@ -11,7 +12,7 @@ export type Campaign = {
 };
 
 export const generateCampaign = (
-  id: number,
+  id: string,
   creator: string,
   tokenAddress: string,
   feePercentage: number,
@@ -25,7 +26,7 @@ export const generateCampaign = (
     (feePercentage * valuePerShare) / 10000
   );
   return {
-    id,
+    id: sha256(toUtf8Bytes(id)),
     creator,
     tokenAddress,
     totalValue,
