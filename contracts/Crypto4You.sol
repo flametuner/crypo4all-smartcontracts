@@ -78,7 +78,7 @@ contract Crypto4You is Ownable {
   }
 
   function setFeePercentage(uint256 _feePercentage) public onlyOwner {
-    require(_feePercentage <= 1000, "Fee max is 10%");
+    require(_feePercentage <= 2000, "Fee max is 20%");
     feePercentage = _feePercentage;
   }
 
@@ -91,7 +91,7 @@ contract Crypto4You is Ownable {
     address _token,
     uint256 _valuePerShare,
     uint256 _totalValue
-  ) public {
+  ) public payable {
     require(
       campaigns[_campaignId].creator == address(0x0),
       "Campaign already created"
@@ -99,10 +99,15 @@ contract Crypto4You is Ownable {
     require(_valuePerShare > 0 && _totalValue > 0, "must be greater than 0");
     require(_valuePerShare <= _totalValue, "share must be less than Total");
 
-    require(
-      IERC20(_token).transferFrom(_msgSender(), address(this), _totalValue),
-      "Couldn't transfer campaing funds"
-    );
+    if (_token != address(0x0)) {
+      require(
+        IERC20(_token).transferFrom(_msgSender(), address(this), _totalValue) &&
+          msg.value == 0,
+        "Couldn't transfer campaing funds"
+      );
+    } else {
+      require(msg.value == _totalValue, "Different msg.value from _totalValue");
+    }
 
     Campaign storage newCampaign = campaigns[_campaignId];
     newCampaign.creator = _msgSender();
@@ -127,7 +132,7 @@ contract Crypto4You is Ownable {
   ) public onlyExecutor {
     require(
       _campaignId.length == _users.length &&
-      _users.length == _userIdsFunded.length &&
+        _users.length == _userIdsFunded.length &&
         _userIdsFunded.length == _tweetUrls.length,
       "must have the same length"
     );
@@ -164,7 +169,12 @@ contract Crypto4You is Ownable {
 
     campaign.totalValue -= campaign.valuePerShare + campaign.feePerShare;
     campaign.totalFees += campaign.feePerShare;
-    IERC20(campaign.tokenAddress).transfer(_user, campaign.valuePerShare);
+    if (campaign.tokenAddress != address(0x0)) {
+      IERC20(campaign.tokenAddress).transfer(_user, campaign.valuePerShare);
+    } else {
+      bool success = false;
+      (success, ) = _user.call{ value: campaign.valuePerShare }("");
+    }
 
     emit UserFunded(_campaignId, _user, _tweetUrl);
 
@@ -201,18 +211,23 @@ contract Crypto4You is Ownable {
 
   function fundCampaign(uint256 _campaignId, uint256 amount)
     public
+    payable
     onlyCreator(_campaignId)
   {
     Campaign storage campaign = campaigns[_campaignId];
 
-    require(
-      IERC20(campaign.tokenAddress).transferFrom(
-        _msgSender(),
-        address(this),
-        amount
-      ),
-      "Couldn't transfer campaing funds"
-    );
+    if (campaign.tokenAddress != address(0x0)) {
+      require(
+        IERC20(campaign.tokenAddress).transferFrom(
+          _msgSender(),
+          address(this),
+          amount
+        ) && msg.value == 0,
+        "Couldn't transfer campaing funds"
+      );
+    } else {
+      require(msg.value == amount, "Different msg.value from _totalValue");
+    }
 
     campaign.totalValue += amount;
     emit CampaignFunded(_campaignId, amount);
@@ -228,8 +243,12 @@ contract Crypto4You is Ownable {
     require(_withdrawValue <= campaign.totalValue, "Withdraw value too high");
 
     campaign.totalValue -= _withdrawValue;
-    IERC20(campaign.tokenAddress).transfer(_msgSender(), _withdrawValue);
-
+    if (campaign.tokenAddress != address(0x0)) {
+      IERC20(campaign.tokenAddress).transfer(_msgSender(), _withdrawValue);
+    } else {
+      bool success = false;
+      (success, ) = _msgSender().call{ value: _withdrawValue }("");
+    }
     emit CampaignWithdrawn(_campaignId, _withdrawValue);
     verifyForPausing(_campaignId);
   }
@@ -254,7 +273,12 @@ contract Crypto4You is Ownable {
 
     uint256 totalFees = campaign.totalFees;
     campaign.totalFees = 0;
-    IERC20(campaign.tokenAddress).transfer(_msgSender(), totalFees);
+    if (campaign.tokenAddress != address(0x0)) {
+      IERC20(campaign.tokenAddress).transfer(_msgSender(), totalFees);
+    } else {
+      bool success = false;
+      (success, ) = _msgSender().call{ value: totalFees }("");
+    }
   }
 
   // Batch withdraw fees from campaign array

@@ -20,7 +20,7 @@ export const generateCampaign = (
 ): Campaign => {
   const valuePerShare = minValuePerShare + Math.floor(Math.random() * 100000);
   const totalValue =
-    valuePerShare * (minShares + Math.floor(Math.random() * 100));
+    valuePerShare * (minShares + Math.floor(Math.random() * 100)) * 2;
   const returningFeePerShare = Math.floor(
     (feePercentage * valuePerShare) / 10000
   );

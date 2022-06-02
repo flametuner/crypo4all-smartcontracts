@@ -1,10 +1,13 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { constants } from "ethers";
+import { ethers, waffle } from "hardhat";
 // eslint-disable-next-line node/no-missing-import
 import { Crypto4You, TestToken } from "../typechain";
 // eslint-disable-next-line node/no-missing-import
 import { Campaign, generateCampaign } from "./util";
+
+const provider = waffle.provider;
 
 describe("Contract Management", () => {
   let instance: Crypto4You;
@@ -27,10 +30,10 @@ describe("Contract Management", () => {
     expect(await instance.feePercentage()).to.equal(1000);
   });
 
-  it("shouldn't update fee percentage greater than 10%", async () => {
-    const setFeePertcentageTx = instance.setFeePercentage(1001);
+  it("shouldn't update fee percentage greater than 20%", async () => {
+    const setFeePertcentageTx = instance.setFeePercentage(2001);
 
-    await expect(setFeePertcentageTx).to.be.revertedWith("Fee max is 10%");
+    await expect(setFeePertcentageTx).to.be.revertedWith("Fee max is 20%");
   });
 
   it("shouldn't update fee percentage if not owner", async () => {
@@ -134,6 +137,31 @@ describe("Create Campaign", () => {
       campaign.returningFeePerShare
     );
   });
+  it("should create campaign with native token", async () => {
+    const createCampaignTx = await instance
+      .connect(creator)
+      .createCampaign(
+        campaign.id,
+        constants.AddressZero,
+        campaign.valuePerShare,
+        campaign.totalValue,
+        {
+          value: campaign.totalValue,
+        }
+      );
+
+    expect(createCampaignTx)
+      .to.emit(instance, "CampaignCreated")
+      .withArgs(
+        campaign.id,
+        constants.AddressZero,
+        campaign.returningValuePerShare,
+        campaign.totalValue
+      );
+    expect(await provider.getBalance(instance.address)).to.be.equal(
+      campaign.totalValue
+    );
+  });
   it("shouldn't create campaign if already created", async () => {
     const approveTx = await erc20
       .connect(creator)
@@ -181,6 +209,20 @@ describe("Create Campaign", () => {
 
     await expect(createCampaignTx).to.be.revertedWith(
       "ERC20: transfer amount exceeds allowance"
+    );
+  });
+  it("shouldn't create campaign with native token if total value different", async () => {
+    const createCampaignTx = instance
+      .connect(creator)
+      .createCampaign(
+        campaign.id,
+        constants.AddressZero,
+        campaign.valuePerShare,
+        campaign.totalValue
+      );
+
+    await expect(createCampaignTx).to.be.revertedWith(
+      "Different msg.value from _totalValue"
     );
   });
   it("shouldn't create campaign if invalid erc20 token address", async () => {
@@ -1005,5 +1047,132 @@ describe("Withdraw funds", () => {
       const campaignAfter = await instance.campaigns(campaignIds[i]);
       expect(campaignAfter.totalFees).to.be.equal(0);
     }
+  });
+});
+describe("Native token", () => {
+  let instance: Crypto4You;
+  let owner: SignerWithAddress;
+  let creator: SignerWithAddress;
+  let user: SignerWithAddress;
+  let erc20: TestToken;
+  let campaign: Campaign;
+  let feePercentage: number;
+  let userIdCounter: number = 0;
+  let campaignId: number = 0;
+
+  before(async () => {
+    const Crypto4You = await ethers.getContractFactory("Crypto4You");
+    const TestToken = await ethers.getContractFactory("TestToken");
+    [owner, creator, user] = await ethers.getSigners();
+
+    instance = await Crypto4You.deploy(owner.address, 500);
+    await instance.deployed();
+
+    erc20 = await TestToken.deploy();
+    await erc20.deployed();
+
+    feePercentage = (await instance.feePercentage()).toNumber();
+  });
+  beforeEach(async () => {
+    campaign = generateCampaign(
+      campaignId++,
+      creator.address,
+      erc20.address,
+      feePercentage,
+      100
+    );
+    const mintTx = await erc20.mint(creator.address, campaign.totalValue); // 21 million
+    await mintTx.wait();
+    const approveTx = await erc20
+      .connect(creator)
+      .approve(instance.address, campaign.totalValue);
+    await approveTx.wait();
+    const createCampaignTx = await instance
+      .connect(creator)
+      .createCampaign(
+        campaign.id,
+        constants.AddressZero,
+        campaign.valuePerShare,
+        campaign.totalValue,
+        {
+          value: campaign.totalValue,
+        }
+      );
+    await createCampaignTx.wait();
+  });
+  it("should check tweets in native", async () => {
+    const balanceBefore = await user.getBalance();
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = await instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId,
+      "tweet_url"
+    );
+
+    expect(checkTweetTx)
+      .to.emit(instance, "UserFunded")
+      .withArgs(campaign.id, user.address, "tweet_url");
+
+    const balanceAfter = await user.getBalance();
+    expect(balanceAfter).to.be.equal(
+      balanceBefore.add(campaign.returningValuePerShare)
+    );
+  });
+  it("should fund campaign in native", async () => {
+    const valueToFund = campaign.valuePerShare;
+    const balanceBefore = await provider.getBalance(instance.address);
+    const fundCampaignTx = await instance
+      .connect(creator)
+      .fundCampaign(campaign.id, valueToFund, {
+        value: valueToFund,
+      });
+
+    expect(fundCampaignTx)
+      .to.emit(instance, "CampaignFunded")
+      .withArgs(campaign.id, valueToFund);
+    const balanceAfter = await provider.getBalance(instance.address);
+    expect(balanceAfter).to.be.equal(balanceBefore.add(valueToFund));
+  });
+  it("shouldn't fund campaign in native if different values", async () => {
+    const valueToFund = campaign.valuePerShare;
+    const fundCampaignTx = instance
+      .connect(creator)
+      .fundCampaign(campaign.id, valueToFund, {
+        value: valueToFund + 1,
+      });
+    await expect(fundCampaignTx).to.be.revertedWith(
+      "Different msg.value from _totalValue"
+    );
+  });
+  it("should withdraw funds from campaign in native", async () => {
+    const withdrawValue = Math.floor(campaign.totalValue / 2);
+    const withdrawCampaignTx = await instance
+      .connect(creator)
+      .withdrawFunds(campaign.id, withdrawValue);
+
+    expect(withdrawCampaignTx)
+      .to.emit(instance, "CampaignWithdrawn")
+      .withArgs(campaign.id, withdrawValue);
+    const campaignContract = await instance.campaigns(campaign.id);
+    expect(campaignContract.totalValue).to.be.equal(
+      campaign.totalValue - withdrawValue
+    );
+  });
+  it("should be able to withdraw fees in native", async () => {
+    const userId = `random_id_${userIdCounter++}`;
+    const checkTweetTx = await instance.checkTweet(
+      campaign.id,
+      user.address,
+      userId,
+      "tweet_url"
+    );
+    await checkTweetTx.wait();
+    const campaignBefore = await instance.campaigns(campaign.id);
+    expect(campaignBefore.totalFees.toNumber()).to.be.greaterThan(0);
+    const withdrawFeesTx = await instance.withdrawFees(campaign.id);
+    await withdrawFeesTx.wait();
+    const campaignAfter = await instance.campaigns(campaign.id);
+    expect(campaignAfter.totalFees).to.be.equal(0);
   });
 });
