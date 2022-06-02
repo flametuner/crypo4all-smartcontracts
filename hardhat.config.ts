@@ -48,7 +48,7 @@ const config: HardhatUserConfig = {
   },
   abiExporter: {
     clear: true,
-    only: ["Crypto4You"],
+    only: ["Crypto4All"],
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
