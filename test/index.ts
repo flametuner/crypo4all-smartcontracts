@@ -835,6 +835,28 @@ describe("Check tweets", () => {
   });
   // BATCH TWEETS
   it("should check tweets in batch", async () => {
+    const campaignList = [];
+    for (let i = 0; i < 10; i++) {
+      const c = generateCampaign(
+        randomUUID(),
+        creator.address,
+        erc20.address,
+        feePercentage,
+        100
+      );
+
+      const mintTx = await erc20.mint(creator.address, c.totalValue); // 21 million
+      await mintTx.wait();
+      const approveTx = await erc20
+        .connect(creator)
+        .approve(instance.address, c.totalValue);
+      await approveTx.wait();
+      const createCampaignTx = await instance
+        .connect(creator)
+        .createCampaign(c.id, c.tokenAddress, c.valuePerShare, c.totalValue);
+      await createCampaignTx.wait();
+      campaignList.push(c);
+    }
     const total = 10;
     const campaignIds = [];
     const userAddress = [];
@@ -842,11 +864,14 @@ describe("Check tweets", () => {
     const tweetsUrls = [];
 
     for (let i = 0; i < total; i++) {
-      const addr = (await ethers.getSigners())[10 + i].address;
-      usersIds.push(`random_id_${userIdCounter++}`);
-      userAddress.push(addr);
-      tweetsUrls.push("tweet_url");
-      campaignIds.push(campaign.id);
+      const userId = `random_id_${userIdCounter++}`;
+      for (let j = 0; j < campaignList.length; j++) {
+        const addr = (await ethers.getSigners())[10 + i].address;
+        usersIds.push(userId);
+        userAddress.push(addr);
+        tweetsUrls.push("tweet_url");
+        campaignIds.push(campaignList[j].id);
+      }
     }
     const checkTweetTx = await instance.batchCheckTweets(
       campaignIds,
@@ -855,28 +880,32 @@ describe("Check tweets", () => {
       tweetsUrls
     );
     for (let i = 0; i < total; i++) {
-      expect(checkTweetTx)
-        .to.emit(instance, "UserFunded")
-        .withArgs(
-          campaign.id,
-          userAddress[i],
-          usersIds[i],
-          tweetsUrls[i],
-          campaign.returningValuePerShare
-        );
-      const balance = await erc20.balanceOf(userAddress[i]);
-      expect(balance).to.be.equal(campaign.returningValuePerShare);
+      for (let j = 0; j < campaignList.length; j++) {
+        const c = campaignList[j];
+        expect(checkTweetTx)
+          .to.emit(instance, "UserFunded")
+          .withArgs(
+            c.id,
+            userAddress[i],
+            usersIds[i],
+            tweetsUrls[i],
+            c.returningValuePerShare
+          );
+      }
     }
-    const campaignAfter = await instance.campaigns(campaign.id);
-    expect(campaignAfter.totalFees).to.be.equal(
-      campaign.returningFeePerShare * total
-    );
-    expect(campaignAfter.totalValue).to.be.equal(
-      campaign.totalValue - campaign.valuePerShare * total
-    );
-    expect(campaignAfter.totalFees).to.be.equal(
-      campaign.returningFeePerShare * total
-    );
+    for (let j = 0; j < campaignList.length; j++) {
+      const c = campaignList[j];
+      const campaignAfter = await instance.campaigns(c.id);
+      expect(campaignAfter.totalFees).to.be.equal(
+        c.returningFeePerShare * total
+      );
+      expect(campaignAfter.totalValue).to.be.equal(
+        c.totalValue - c.valuePerShare * total
+      );
+      expect(campaignAfter.totalFees).to.be.equal(
+        c.returningFeePerShare * total
+      );
+    }
   });
   it("shouldn't batch if different arrays length", async () => {
     const total = 3;
