@@ -9,9 +9,8 @@ Crypto4All is a Solidity smart contract that allows for the creation of crowdfun
 
 ## Compiling and Deploying
 - Clone the repository
-- Run `yarn` install to install the necessary dependencies
+- Run `yarn install` to install the necessary dependencies
 - Compile the contract using `yarn compile`
-- Deploy the contract using `yarn deploy`
 
 ## Testing
 
