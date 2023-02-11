@@ -1,46 +1,46 @@
-# Advanced Sample Hardhat Project
+# Crypto4All
+Crypto4All is a Solidity smart contract that allows for the creation of crowdfunding campaigns for various projects. The contract follows the ERC20 standard and uses OpenZeppelin's Ownable contract for ownership management.
 
-This project demonstrates an advanced Hardhat use case, integrating other tools commonly used alongside Hardhat in the ecosystem.
+## Dependencies
+- Hardhat v2
+- Ethers v5
+- Yarn
 
-The project comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts. It also comes with a variety of other tools, preconfigured to work with the project code.
 
-Try running some of the following tasks:
+## Compiling and Deploying
+- Clone the repository
+- Run `yarn` install to install the necessary dependencies
+- Compile the contract using `yarn compile`
+- Deploy the contract using `yarn deploy`
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-npx hardhat help
-REPORT_GAS=true npx hardhat test
-npx hardhat coverage
-npx hardhat run scripts/deploy.ts
-TS_NODE_FILES=true npx ts-node scripts/deploy.ts
-npx eslint '**/*.{js,ts}'
-npx eslint '**/*.{js,ts}' --fix
-npx prettier '**/*.{json,sol,md}' --check
-npx prettier '**/*.{json,sol,md}' --write
-npx solhint 'contracts/**/*.sol'
-npx solhint 'contracts/**/*.sol' --fix
+## Testing
+
+Use the following command, it currently have 100% coverage for all function and branch: 
+```bash
+yarn test
 ```
 
-# Etherscan verification
+## Contract Functions
+- createCampaign
+This function allows the creator to create a new campaign.
 
-To try out Etherscan verification, you first need to deploy a contract to an Ethereum network that's supported by Etherscan, such as Ropsten.
+- setFeePercentage
+This function allows the contract owner to set the fee percentage for each campaign.
 
-In this project, copy the .env.example file to a file named .env, and then edit it to fill in the details. Enter your Etherscan API key, your Ropsten node URL (eg from Alchemy), and the private key of the account which will send the deployment transaction. With a valid .env file in place, first deploy your contract:
+- updateExecutor
+This function allows the contract owner to update the executor address.
 
-```shell
-hardhat run --network ropsten scripts/sample-script.ts
-```
+- addressFunded
+This function returns a boolean indicating whether a specific address has funded a particular campaign.
 
-Then, copy the deployment address and paste it in to replace `DEPLOYED_CONTRACT_ADDRESS` in this command:
+- userIdFunded
+This function returns a boolean indicating whether a specific user ID has funded a particular campaign.
 
-```shell
-npx hardhat verify --network ropsten DEPLOYED_CONTRACT_ADDRESS "Hello, Hardhat!"
-```
-
-# Performance optimizations
-
-For faster runs of your tests and scripts, consider skipping ts-node's type checking by setting the environment variable `TS_NODE_TRANSPILE_ONLY` to `1` in hardhat's environment. For more details see [the documentation](https://hardhat.org/guides/typescript.html#performance-optimizations).
+## Contract Events
+- CampaignCreated
+- CampaignPaused
+- CampaignResumed
+- CampaignFunded
+- CampaignWithdrawn
+- CampaignValuePerShareUpdated
+- UserFunded
